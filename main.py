@@ -14,16 +14,18 @@ from dotenv import load_dotenv
 from commands.clock import ClockCommand
 from commands.remind import RemindCommand
 from commands.shopping import ShoppingCommand
+from commands.timer import TimerCommand
 from commands.unhandled import UnhandledCommand
 from config import Config
 from dispatcher import Dispatcher
 from recognizer import SpeechRecognizer
 from speaker import PiperSpeaker
 from tasks.vikunja import VikunjaClient
+from tasks.watcher import DueTaskWatcher
 from volume import VolumeController
 
 AUDIO_SAMPLE_RATE = 16000
-AUDIO_CHUNK = 1024
+AUDIO_CHUNK = 4000
 AUDIO_QUEUE_MAX = 64
 
 
@@ -37,13 +39,16 @@ def main() -> None:
         sys.exit("VIKUNJA_TOKEN is not set")
 
     vikunja = VikunjaClient(config.vikunja_url, vikunja_token)
-    speaker = PiperSpeaker(config.piper_bin, config.piper_model, config.piper_sample_rate)
+    speaker = PiperSpeaker(
+        config.piper_bin, config.piper_model, config.piper_sample_rate
+    )
     volume = VolumeController(config.volume_duck_level)
 
     handlers = [
         RemindCommand(vikunja, speaker, config.vikunja_project_id),
         ShoppingCommand(vikunja, speaker, config.vikunja_shopping_project_id),
         ClockCommand(speaker),
+        TimerCommand(speaker),
         UnhandledCommand(speaker),
     ]
     dispatcher = Dispatcher(handlers)
@@ -55,17 +60,21 @@ def main() -> None:
     wake_queue: queue.Queue[None] = queue.Queue()
 
     def audio_callback(indata: np.ndarray, frames: int, time_info, status) -> None:
-        pcm = (indata[:, 0] * 32767).astype(np.int16).tobytes()
         try:
-            audio_queue.put_nowait(pcm)
+            audio_queue.put_nowait(indata.tobytes())
         except queue.Full:
             pass
 
     # Spawn the Python wake word detector as a child process. It writes "wake" to
     # stdout each time the wake word fires; we read that on a background thread.
     wakeword_proc = subprocess.Popen(
-        [sys.executable, config.wakeword_script, config.wakeword_model,
-         "--threshold", str(config.wakeword_threshold)],
+        [
+            sys.executable,
+            config.wakeword_script,
+            config.wakeword_model,
+            "--threshold",
+            str(config.wakeword_threshold),
+        ],
         stdout=subprocess.PIPE,
     )
 
@@ -77,6 +86,8 @@ def main() -> None:
 
     threading.Thread(target=watch_wakeword, daemon=True).start()
 
+    DueTaskWatcher(vikunja, speaker, config.vikunja_project_id).start()
+
     print("Ready. Listening for wake word...\n")
     speaker.speak("Ready.")
 
@@ -85,7 +96,7 @@ def main() -> None:
     with sd.InputStream(
         samplerate=AUDIO_SAMPLE_RATE,
         channels=1,
-        dtype="float32",
+        dtype="int16",
         blocksize=AUDIO_CHUNK,
         callback=audio_callback,
     ):

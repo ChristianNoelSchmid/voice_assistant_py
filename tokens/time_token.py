@@ -5,11 +5,11 @@ from dataclasses import dataclass
 from typing import Optional
 
 # "at 12:44 PM" — canonical colon form
-_AT_TIME = re.compile(r"(?i)\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b")
+_AT_TIME = re.compile(r"(?i)\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am?|pm?)\b")
 # "at 12 44 PM" — ASR space-separated form
-_AT_TIME_SPACE = re.compile(r"(?i)\bat\s+(\d{1,2})\s+([0-5]\d)\s*(am|pm)\b")
+_AT_TIME_SPACE = re.compile(r"(?i)\bat\s+(\d{1,2})\s+([0-5]\d)\s*(am?|pm?)\b")
 # "at 12 40 4 PM" — ASR splits "forty-four" into tens digit + ones digit
-_AT_TIME_SPLIT = re.compile(r"(?i)\bat\s+(\d{1,2})\s+([1-5]0)\s+([1-9])\s*(am|pm)\b")
+_AT_TIME_SPLIT = re.compile(r"(?i)\bat\s+(\d{1,2})\s+([1-5]0)\s+([1-9])\s*(am?|pm?)\b")
 _AT_NOON = re.compile(r"(?i)\bat\s+noon\b")
 _AT_MIDNIGHT = re.compile(r"(?i)\bat\s+midnight\b")
 
@@ -18,7 +18,7 @@ _AT_MIDNIGHT = re.compile(r"(?i)\bat\s+midnight\b")
 class TimeToken:
     """A clock time parsed from phrases like 'at 9:30 PM', 'at noon', or 'at midnight'."""
 
-    hour: int    # 0–23
+    hour: int  # 0–23
     minute: int  # 0–59
 
 
@@ -44,7 +44,9 @@ def parse(text: str) -> Optional[tuple[TimeToken, tuple[int, int]]]:
     # so "40 4" isn't accidentally matched as minute=40.
     m = _AT_TIME_SPLIT.search(text)
     if m:
-        hour, minute = _apply_ampm(int(m.group(1)), int(m.group(2)) + int(m.group(3)), m.group(4))
+        hour, minute = _apply_ampm(
+            int(m.group(1)), int(m.group(2)) + int(m.group(3)), m.group(4)
+        )
         return TimeToken(hour=hour, minute=minute), (m.start(), m.end())
 
     m = _AT_TIME_SPACE.search(text)

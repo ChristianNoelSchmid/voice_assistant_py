@@ -37,12 +37,41 @@ class VikunjaClient(TaskClient):
         if repeat_mode is not None:
             body["repeat_mode"] = repeat_mode
 
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "Accept": "application/json",
+        }
         url = f"{self._base_url}/api/v1/projects/{project_id}/tasks"
         with httpx.Client() as client:
-            resp = client.put(
-                url,
-                json=body,
-                headers={"Authorization": f"Bearer {self._token}"},
-            )
-        if resp.status_code >= 400:
-            raise RuntimeError(f"Vikunja API returned {resp.status_code}: {resp.text}")
+            resp = client.put(url, json=body, headers=headers)
+            if resp.status_code >= 400:
+                raise RuntimeError(
+                    f"Vikunja API returned {resp.status_code}: {resp.text}"
+                )
+
+    def get_project_tasks(self, project_id: int) -> list[dict]:
+        """Return all tasks for *project_id*, handling pagination."""
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "Accept": "application/json",
+        }
+        tasks: list[dict] = []
+        page = 1
+        with httpx.Client() as client:
+            while True:
+                url = f"{self._base_url}/api/v1/projects/{project_id}/tasks"
+                resp = client.get(
+                    url, headers=headers, params={"page": page, "per_page": 50}
+                )
+                if resp.status_code >= 400:
+                    raise RuntimeError(
+                        f"Vikunja API returned {resp.status_code}: {resp.text}"
+                    )
+                batch: list[dict] = resp.json()
+                if not batch:
+                    break
+                tasks.extend(batch)
+                if len(batch) < 50:
+                    break
+                page += 1
+        return tasks

@@ -9,10 +9,13 @@ from typing import Optional
 from commands import CommandHandler
 from speaker import Speaker
 from tasks import TaskClient
-from tokens.duration_token import DurationToken, parse as parse_duration
-from tokens.period import PeriodToken, Recurrence, Weekday, parse as parse_period
+from tokens.duration_token import DurationToken
+from tokens.duration_token import parse as parse_duration
+from tokens.period import PeriodToken, Recurrence, Weekday
+from tokens.period import parse as parse_period
 from tokens.remind_token import parse as parse_remind
-from tokens.time_token import TimeToken, parse as parse_time
+from tokens.time_token import TimeToken
+from tokens.time_token import parse as parse_time
 
 _TO_CONTENT = re.compile(r"(?i)\bto\s+(\S.*)")
 
@@ -66,7 +69,9 @@ class RemindCommand(CommandHandler):
             return None
 
         content = _extract_content(text, remind_span[1], consumed)
-        return RemindMatch(content=content, period=period, time=time_tok, duration=duration)
+        return RemindMatch(
+            content=content, period=period, time=time_tok, duration=duration
+        )
 
     def handle(self, match: RemindMatch) -> None:
         print(f'[Remind] "{match.content}"')
@@ -82,7 +87,12 @@ class RemindCommand(CommandHandler):
 
         try:
             self._client.create_task(
-                match.content, due_date, repeat_after, repeat_mode, self._project_id
+                match.content,
+                due_date,
+                repeat_after,
+                repeat_mode,
+                self._project_id,
+                True,
             )
             print("[Remind] Task created.")
             self._speaker.speak(f'Created reminder: "{match.content}"')
@@ -114,7 +124,9 @@ def _compute_due_date(
 ) -> Optional[datetime]:
     """Compute the UTC due date from an optional period, time, or duration offset."""
     if duration is not None:
-        return (datetime.now().astimezone() + timedelta(seconds=duration.seconds)).astimezone(timezone.utc)
+        return (
+            datetime.now().astimezone() + timedelta(seconds=duration.seconds)
+        ).astimezone(timezone.utc)
 
     today = date.today()
     naive_time = time(time_tok.hour, time_tok.minute) if time_tok else time(12, 0)
@@ -134,7 +146,9 @@ def _compute_due_date(
     return local_dt.astimezone(timezone.utc)
 
 
-def _compute_repeat(period: Optional[PeriodToken]) -> tuple[Optional[int], Optional[int]]:
+def _compute_repeat(
+    period: Optional[PeriodToken],
+) -> tuple[Optional[int], Optional[int]]:
     """Return (repeat_after, repeat_mode) for the Vikunja API."""
     if period is None or period.recurrence == Recurrence.ONCE:
         return None, None
@@ -151,8 +165,13 @@ def _compute_repeat(period: Optional[PeriodToken]) -> tuple[Optional[int], Optio
 def _next_weekday(from_date: date, weekday: Weekday) -> date:
     """Return the next occurrence of *weekday* strictly after or on *from_date*."""
     targets = {
-        Weekday.MONDAY: 0, Weekday.TUESDAY: 1, Weekday.WEDNESDAY: 2,
-        Weekday.THURSDAY: 3, Weekday.FRIDAY: 4, Weekday.SATURDAY: 5, Weekday.SUNDAY: 6,
+        Weekday.MONDAY: 0,
+        Weekday.TUESDAY: 1,
+        Weekday.WEDNESDAY: 2,
+        Weekday.THURSDAY: 3,
+        Weekday.FRIDAY: 4,
+        Weekday.SATURDAY: 5,
+        Weekday.SUNDAY: 6,
     }
     delta = (targets[weekday] - from_date.weekday()) % 7
     return from_date + timedelta(days=delta or 7)

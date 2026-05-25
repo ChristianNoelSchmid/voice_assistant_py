@@ -92,7 +92,6 @@ class RemindCommand(CommandHandler):
                 repeat_after,
                 repeat_mode,
                 self._project_id,
-                True,
             )
             print("[Remind] Task created.")
             self._speaker.speak(f'Created reminder: "{match.content}"')

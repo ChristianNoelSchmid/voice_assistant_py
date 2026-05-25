@@ -39,9 +39,7 @@ class ShoppingCommand(CommandHandler):
     def handle(self, match: ShoppingMatch) -> None:
         print(f'[Shopping] "{match.item}"')
         try:
-            self._client.create_task(
-                match.item, None, None, None, self._project_id
-            )
+            self._client.create_task(match.item, None, None, None, self._project_id)
             print("[Shopping] Item added.")
             self._speaker.speak(f'Added "{match.item}" to your shopping list.')
         except Exception as e:

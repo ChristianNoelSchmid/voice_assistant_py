@@ -6,12 +6,15 @@ import subprocess
 import sys
 
 
-class VolumeController:
-    """Ducks other applications' audio output streams via PipeWire.
+_DUCK_CLASSES = {"Stream/Output/Audio", "Stream/Input/Audio"}
 
-    Uses pw-dump to enumerate Stream/Output/Audio nodes and wpctl to get/set
-    their volumes. The assistant's own TTS creates a new node after duck()
-    returns and is therefore never affected.
+
+class VolumeController:
+    """Ducks other applications' audio streams (input and output) via PipeWire.
+
+    Uses pw-dump to enumerate Stream/Output/Audio and Stream/Input/Audio nodes
+    and wpctl to get/set their volumes. The assistant's own TTS creates a new
+    node after duck() returns and is therefore never affected.
     """
 
     def __init__(self, duck_level: float = 0.3) -> None:
@@ -39,7 +42,7 @@ class VolumeController:
         self._saved.clear()
 
     def _stream_nodes(self) -> list[tuple[str, str]]:
-        """Return (node_id, volume) for all active Stream/Output/Audio nodes."""
+        """Return (node_id, volume) for all active audio stream nodes."""
         try:
             raw = subprocess.run(
                 ["pw-dump"], capture_output=True, text=True, timeout=5
@@ -54,7 +57,7 @@ class VolumeController:
             if node.get("type") != "PipeWire:Interface:Node":
                 continue
             props = node.get("info", {}).get("props", {})
-            if props.get("media.class") != "Stream/Output/Audio":
+            if props.get("media.class") not in _DUCK_CLASSES:
                 continue
             node_id = str(node["id"])
             vol = _get_volume(node_id)

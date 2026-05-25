@@ -1,0 +1,10 @@
+{
+  "vosk_model": "lib/vosk_model",
+  "vikunja_url": "https://vikunja.schmid-space.com",
+  "vikunja_project_id": 2,
+  "vikunja_shopping_project_id": 3,
+  "piper_bin": "lib/piper/piper",
+  "piper_model": "lib/piper_model/en_US-lessac-medium.onnx",
+  "wakeword_script": "wakeword.py",
+  "wakeword_model": "hey_jarvis"
+}

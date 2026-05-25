@@ -1,0 +1,7 @@
+vosk
+sounddevice
+numpy
+openwakeword
+onnxruntime
+httpx
+python-dotenv

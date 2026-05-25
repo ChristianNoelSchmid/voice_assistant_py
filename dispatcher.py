@@ -36,7 +36,7 @@ class Dispatcher:
             self._active = False
         return self._active
 
-    async def dispatch(self, event: RecognitionEvent) -> None:
+    def dispatch(self, event: RecognitionEvent) -> None:
         """Route a finalized recognition event to the first matching handler."""
         if not isinstance(event, FinalEvent):
             return
@@ -44,5 +44,5 @@ class Dispatcher:
         # cannot re-trigger a command.
         self._active = False
         for handler in self._handlers:
-            if await handler.try_handle(event.text):
+            if handler.try_handle(event.text):
                 break

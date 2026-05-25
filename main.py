@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import asyncio
 import os
+import queue
+import subprocess
 import sys
+import threading
 
 import numpy as np
 import sounddevice as sd
@@ -18,21 +20,14 @@ from dispatcher import Dispatcher
 from recognizer import SpeechRecognizer
 from speaker import PiperSpeaker
 from tasks.vikunja import VikunjaClient
+from volume import VolumeController
 
 AUDIO_SAMPLE_RATE = 16000
 AUDIO_CHUNK = 1024
 AUDIO_QUEUE_MAX = 64
 
 
-def _safe_put(q: asyncio.Queue, item: object) -> None:
-    """Put *item* onto *q* without blocking; silently drops if the queue is full."""
-    try:
-        q.put_nowait(item)
-    except asyncio.QueueFull:
-        pass
-
-
-async def main() -> None:
+def main() -> None:
     load_dotenv()
 
     config = Config.load("config.json")
@@ -43,6 +38,7 @@ async def main() -> None:
 
     vikunja = VikunjaClient(config.vikunja_url, vikunja_token)
     speaker = PiperSpeaker(config.piper_bin, config.piper_model, config.piper_sample_rate)
+    volume = VolumeController(config.volume_duck_level)
 
     handlers = [
         RemindCommand(vikunja, speaker, config.vikunja_project_id),
@@ -55,34 +51,36 @@ async def main() -> None:
     print(f"Loading model from '{config.vosk_model}'...")
     recognizer = SpeechRecognizer(config.vosk_model)
 
-    loop = asyncio.get_running_loop()
-    audio_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=AUDIO_QUEUE_MAX)
-    wake_queue: asyncio.Queue[None] = asyncio.Queue()
+    audio_queue: queue.Queue[bytes] = queue.Queue(maxsize=AUDIO_QUEUE_MAX)
+    wake_queue: queue.Queue[None] = queue.Queue()
 
     def audio_callback(indata: np.ndarray, frames: int, time_info, status) -> None:
         pcm = (indata[:, 0] * 32767).astype(np.int16).tobytes()
-        loop.call_soon_threadsafe(_safe_put, audio_queue, pcm)
+        try:
+            audio_queue.put_nowait(pcm)
+        except queue.Full:
+            pass
 
     # Spawn the Python wake word detector as a child process. It writes "wake" to
-    # stdout each time the wake word fires; we read that here on a background task.
-    wakeword_proc = await asyncio.create_subprocess_exec(
-        sys.executable,
-        config.wakeword_script,
-        config.wakeword_model,
-        "--threshold", str(config.wakeword_threshold),
-        stdout=asyncio.subprocess.PIPE,
+    # stdout each time the wake word fires; we read that on a background thread.
+    wakeword_proc = subprocess.Popen(
+        [sys.executable, config.wakeword_script, config.wakeword_model,
+         "--threshold", str(config.wakeword_threshold)],
+        stdout=subprocess.PIPE,
     )
 
-    async def watch_wakeword() -> None:
-        async for line in wakeword_proc.stdout:
+    def watch_wakeword() -> None:
+        for line in wakeword_proc.stdout:
             if line.strip() == b"wake":
-                await wake_queue.put(None)
+                wake_queue.put(None)
         print("[Wakeword] detector exited — wake detection stopped", file=sys.stderr)
 
-    asyncio.create_task(watch_wakeword())
+    threading.Thread(target=watch_wakeword, daemon=True).start()
 
     print("Ready. Listening for wake word...\n")
-    await speaker.speak("Ready.")
+    speaker.speak("Ready.")
+
+    ducked = False
 
     with sd.InputStream(
         samplerate=AUDIO_SAMPLE_RATE,
@@ -95,27 +93,39 @@ async def main() -> None:
             # Non-blocking wake signal check before consuming the next audio chunk.
             try:
                 wake_queue.get_nowait()
+                if not ducked:
+                    volume.duck()
+                    ducked = True
                 dispatcher.activate()
                 recognizer.reset()
-            except asyncio.QueueEmpty:
+            except queue.Empty:
                 pass
 
             # Wait up to 50 ms for a chunk; short timeout keeps the wake check responsive.
             try:
-                chunk = await asyncio.wait_for(audio_queue.get(), timeout=0.05)
-            except asyncio.TimeoutError:
+                chunk = audio_queue.get(timeout=0.05)
+            except queue.Empty:
+                if ducked and not dispatcher.is_active():
+                    volume.unduck()
+                    ducked = False
                 continue
 
             if not dispatcher.is_active():
+                if ducked:
+                    volume.unduck()
+                    ducked = False
                 continue
 
-            # Vosk is CPU-bound; run in a thread so it doesn't stall the event loop.
-            event = await loop.run_in_executor(None, recognizer.process, chunk)
+            event = recognizer.process(chunk)
             if event is not None:
-                await dispatcher.dispatch(event)
+                dispatcher.dispatch(event)
+                # dispatch() only deactivates for FinalEvents; unduck only then.
+                if ducked and not dispatcher.is_active():
+                    volume.unduck()
+                    ducked = False
 
     wakeword_proc.kill()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

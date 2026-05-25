@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+import subprocess
 import sys
 from abc import ABC, abstractmethod
 
@@ -12,7 +12,7 @@ class Speaker(ABC):
     """Abstraction over a text-to-speech backend."""
 
     @abstractmethod
-    async def speak(self, text: str) -> None:
+    def speak(self, text: str) -> None:
         """Synthesise *text* and block until playback has fully completed."""
         ...
 
@@ -29,27 +29,18 @@ class PiperSpeaker(Speaker):
         self._model = model_path
         self._rate = sample_rate
 
-    async def speak(self, text: str) -> None:
+    def speak(self, text: str) -> None:
         """Synthesise *text* with Piper and block until playback finishes."""
-        proc = await asyncio.create_subprocess_exec(
-            self._bin,
-            "--model", self._model,
-            "--output-raw",
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        proc = subprocess.run(
+            [self._bin, "--model", self._model, "--output-raw"],
+            input=text.encode(),
+            capture_output=True,
         )
-        stdout, stderr = await proc.communicate(input=text.encode())
         if proc.returncode != 0:
             print(
-                f"[Speaker] piper failed (exit {proc.returncode}): {stderr.decode()}",
+                f"[Speaker] piper failed (exit {proc.returncode}): {proc.stderr.decode()}",
                 file=sys.stderr,
             )
             return
-
-        samples = np.frombuffer(stdout, dtype=np.int16)
-        loop = asyncio.get_running_loop()
-        # sd.play + sd.wait are blocking; run them in a thread to keep the event loop free.
-        await loop.run_in_executor(
-            None, lambda: sd.play(samples, samplerate=self._rate, blocking=True)
-        )
+        samples = np.frombuffer(proc.stdout, dtype=np.int16)
+        sd.play(samples, samplerate=self._rate, blocking=True)

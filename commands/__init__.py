@@ -19,15 +19,15 @@ class CommandHandler(ABC):
         ...
 
     @abstractmethod
-    async def handle(self, match) -> None:
+    def handle(self, match) -> None:
         """Act on a successfully parsed match object."""
         ...
 
-    async def try_handle(self, text: str) -> bool:
+    def try_handle(self, text: str) -> bool:
         """Normalize, parse, and handle. Returns True if this handler claimed the command."""
         normalized = normalize(text)
         match = self.parse(normalized)
         if match is not None:
-            await self.handle(match)
+            self.handle(match)
             return True
         return False

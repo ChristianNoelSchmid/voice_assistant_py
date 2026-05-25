@@ -9,7 +9,7 @@ class TaskClient(ABC):
     """Abstraction over a task-management backend (e.g. Vikunja)."""
 
     @abstractmethod
-    async def create_task(
+    def create_task(
         self,
         title: str,
         due_date: Optional[datetime],

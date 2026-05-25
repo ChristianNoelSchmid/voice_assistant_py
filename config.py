@@ -23,6 +23,7 @@ class Config:
     wakeword_model: str
     piper_sample_rate: int = 22050
     wakeword_threshold: float = 0.25
+    volume_duck_level: float = 0.3
 
     @classmethod
     def load(cls, path: str = "config.json") -> Config:

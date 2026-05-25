@@ -36,13 +36,13 @@ class ShoppingCommand(CommandHandler):
         item = " ".join(m.group(2).split())
         return ShoppingMatch(item=item)
 
-    async def handle(self, match: ShoppingMatch) -> None:
+    def handle(self, match: ShoppingMatch) -> None:
         print(f'[Shopping] "{match.item}"')
         try:
-            await self._client.create_task(
+            self._client.create_task(
                 match.item, None, None, None, self._project_id
             )
             print("[Shopping] Item added.")
-            await self._speaker.speak(f'Added "{match.item}" to your shopping list.')
+            self._speaker.speak(f'Added "{match.item}" to your shopping list.')
         except Exception as e:
             print(f"[Shopping] Failed to add item: {e}")

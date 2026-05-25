@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from datetime import datetime
 from typing import Optional
 
@@ -20,7 +19,7 @@ class VikunjaClient(TaskClient):
         self._base_url = base_url
         self._token = token
 
-    async def create_task(
+    def create_task(
         self,
         title: str,
         due_date: Optional[datetime],
@@ -39,8 +38,8 @@ class VikunjaClient(TaskClient):
             body["repeat_mode"] = repeat_mode
 
         url = f"{self._base_url}/api/v1/projects/{project_id}/tasks"
-        async with httpx.AsyncClient() as client:
-            resp = await client.put(
+        with httpx.Client() as client:
+            resp = client.put(
                 url,
                 json=body,
                 headers={"Authorization": f"Bearer {self._token}"},

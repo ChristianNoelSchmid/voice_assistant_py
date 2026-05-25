@@ -17,8 +17,8 @@ class ClockCommand(CommandHandler):
         """Match any utterance containing the word 'time'."""
         return text if "time" in text else None
 
-    async def handle(self, match: str) -> None:
+    def handle(self, match: str) -> None:
         now = datetime.now()
         hour = now.hour % 12 or 12
         ampm = "PM" if now.hour >= 12 else "AM"
-        await self._speaker.speak(f"It is {hour} {now.minute:02d} {ampm}")
+        self._speaker.speak(f"It is {hour} {now.minute:02d} {ampm}")

@@ -68,7 +68,7 @@ class RemindCommand(CommandHandler):
         content = _extract_content(text, remind_span[1], consumed)
         return RemindMatch(content=content, period=period, time=time_tok, duration=duration)
 
-    async def handle(self, match: RemindMatch) -> None:
+    def handle(self, match: RemindMatch) -> None:
         print(f'[Remind] "{match.content}"')
         if match.period:
             print(f"  period: {match.period}")
@@ -81,11 +81,11 @@ class RemindCommand(CommandHandler):
         repeat_after, repeat_mode = _compute_repeat(match.period)
 
         try:
-            await self._client.create_task(
+            self._client.create_task(
                 match.content, due_date, repeat_after, repeat_mode, self._project_id
             )
             print("[Remind] Task created.")
-            await self._speaker.speak(f'Created reminder: "{match.content}"')
+            self._speaker.speak(f'Created reminder: "{match.content}"')
         except Exception as e:
             print(f"[Remind] Failed to create task: {e}")
 

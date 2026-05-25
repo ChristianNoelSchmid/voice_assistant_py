@@ -17,7 +17,7 @@ class UnhandledCommand(CommandHandler):
         """Always matches — returns the text verbatim."""
         return text
 
-    async def handle(self, match: str) -> None:
+    def handle(self, match: str) -> None:
         text = f"Quack! You said {match}"
         print(text)
-        await self._speaker.speak(text)
+        self._speaker.speak(text)

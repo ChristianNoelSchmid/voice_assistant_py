@@ -1,11 +1,19 @@
 from __future__ import annotations
 
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
 
 from tasks import TaskClient
+
+
+@dataclass(frozen=True, order=True)
+class TaskDueDate:
+    remind_at: datetime
+    task_id: int
+    title: str
 
 
 class VikunjaClient(TaskClient):
@@ -31,7 +39,6 @@ class VikunjaClient(TaskClient):
         body: dict = {"title": title}
         if due_date is not None:
             body["due_date"] = due_date.strftime("%Y-%m-%dT%H:%M:%SZ")
-            body["reminders"] = [{"relative_period": 0, "relative_to": "due_date"}]
         if repeat_after is not None:
             body["repeat_after"] = repeat_after
         if repeat_mode is not None:
@@ -49,13 +56,14 @@ class VikunjaClient(TaskClient):
                     f"Vikunja API returned {resp.status_code}: {resp.text}"
                 )
 
-    def get_project_tasks(self, project_id: int) -> list[dict]:
-        """Return all tasks for *project_id*, handling pagination."""
+    def get_project_task_due_dates(self, project_id: int) -> list[TaskDueDate]:
+        """Return all reminder for *project_id*, handling pagination."""
         headers = {
             "Authorization": f"Bearer {self._token}",
             "Accept": "application/json",
         }
-        tasks: list[dict] = []
+
+        tasks: list[TaskDueDate] = []
         page = 1
         with httpx.Client() as client:
             while True:
@@ -68,10 +76,33 @@ class VikunjaClient(TaskClient):
                         f"Vikunja API returned {resp.status_code}: {resp.text}"
                     )
                 batch: list[dict] = resp.json()
+
                 if not batch:
                     break
-                tasks.extend(batch)
+
+                for b in batch:
+                    task = self._vinkuja_task_to_due_date(b)
+                    if task is not None:
+                        tasks.append(task)
+
                 if len(batch) < 50:
                     break
+
                 page += 1
         return tasks
+
+    def _vinkuja_task_to_due_date(self, task) -> TaskDueDate | None:
+        due_date_str = task["due_date"]
+        if not due_date_str:
+            return None
+        try:
+            remind_at = datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+        if remind_at > datetime.now(timezone.utc):
+            return TaskDueDate(
+                remind_at=remind_at,
+                task_id=task["id"],
+                title=task["title"],
+            )

@@ -6,7 +6,7 @@ import numpy as np
 from faster_whisper import WhisperModel
 
 SAMPLE_RATE = 16000
-_SILENCE_RMS = 20  # int16 RMS below this counts as silence
+_SILENCE_RMS = 10  # int16 RMS below this counts as silence
 _SILENCE_FRAMES = (
     4  # consecutive silent chunks to end an utterance (~1 s at 4000/16000)
 )

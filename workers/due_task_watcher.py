@@ -2,14 +2,10 @@ from __future__ import annotations
 
 import threading
 import time
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from datetime import datetime, timedelta, timezone
 
-from tasks.vikunja import TaskDueDate
-
-if TYPE_CHECKING:
-    from speaker import Speaker
-    from tasks.vikunja import VikunjaClient
+from speaker import Speaker
+from tasks.vikunja import TaskDueDate, VikunjaClient
 
 _POLL_INTERVAL = 10  # 10 minutes
 
@@ -24,40 +20,45 @@ class DueTaskWatcher(threading.Thread):
         self._client = client
         self._speaker = speaker
         self._project_id = project_id
-        self._cache: list[TaskDueDate] = []
+        self._upcoming_reminders: list[TaskDueDate] = []
 
     def run(self) -> None:
         while True:
-            self._refresh()
-            last_poll = time.monotonic()
-
-            now = datetime.now(timezone.utc)
-
-            while self._cache and self._cache[0].remind_at <= now:
-                reminder = self._cache.pop(0)
+            while self._upcoming_reminders:
+                reminder = self._upcoming_reminders.pop(0)
                 print(f"[Watcher] Due: {reminder.title!r}")
                 self._speaker.speak(f"Reminder: {reminder.title}")
 
-            seconds_until_poll = _POLL_INTERVAL - (time.monotonic() - last_poll)
-            if self._cache:
+            now = datetime.now(timezone.utc)
+            self._refresh(now)
+
+            seconds_until_poll = _POLL_INTERVAL
+            if self._upcoming_reminders:
                 sleep_for = min(
-                    (self._cache[0].remind_at - now).total_seconds(), seconds_until_poll
+                    (self._upcoming_reminders[0].remind_at - now).total_seconds(),
+                    _POLL_INTERVAL,
                 )
             else:
                 sleep_for = seconds_until_poll
 
-            time.sleep(max(0.0, sleep_for))
+            time.sleep(sleep_for)
 
-    def _refresh(self) -> None:
+    def _refresh(self, now: datetime):
         try:
             task_due_dates = self._client.get_project_task_due_dates(self._project_id)
+            task_due_dates.sort(key=lambda x: x.remind_at)
 
-            for t in task_due_dates:
-                if not any(map(lambda c: c.task_id == t.task_id, self._cache)):
-                    self._cache.append(t)
+            self._upcoming_reminders = list(
+                filter(
+                    lambda dd: (
+                        now + timedelta(seconds=_POLL_INTERVAL + 10) > dd.remind_at
+                    ),
+                    task_due_dates,
+                )
+            )
 
-            self._cache.sort(key=lambda x: x.remind_at)
-
-            print(f"[Watcher] Cache refreshed: {len(self._cache)} upcoming reminder(s)")
+            print(
+                f"[Watcher] Cache refreshed: {len(self._upcoming_reminders)} upcoming reminder(s) ({len(task_due_dates)} total)"
+            )
         except Exception as e:
             print(f"[Watcher] Failed to refresh cache: {e}")

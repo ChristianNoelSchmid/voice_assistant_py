@@ -92,6 +92,9 @@ class VikunjaClient(TaskClient):
         return tasks
 
     def _vinkuja_task_to_due_date(self, task) -> TaskDueDate | None:
+        if "done" not in task or task["done"]:
+            return None
+
         due_date_str = task["due_date"]
         if not due_date_str:
             return None

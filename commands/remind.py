@@ -64,8 +64,8 @@ class RemindCommand(CommandHandler):
             duration, span = duration_result
             consumed.append(span)
 
-        # Require at least a period, time, or duration — bare "remind me to X" is rejected.
-        if period is None and time_tok is None and duration is None:
+        # Require at least a time, or duration — bare "remind me Jan 1st to X" is rejected.
+        if time_tok is None and duration is None:
             return None
 
         content = _extract_content(text, remind_span[1], consumed)
@@ -132,6 +132,11 @@ def _compute_due_date(
 
     if period is None:
         target = today
+    elif period.month is not None:
+        assert (period.monthday) is not None
+        now = datetime.now()
+        year = now.year + 1 if (now.month > period.month.value + 1) else now.year
+        target = date(year, period.month.value + 1, period.monthday)
     elif period.daily:
         target = today
     elif period.weekday is not None:

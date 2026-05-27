@@ -1,5 +1,5 @@
 {
-  "vosk_model": "lib/vosk_model",
+  "whisper_model": "tiny",
   "vikunja_url": "https://vikunja.schmid-space.com",
   "vikunja_project_id": 2,
   "vikunja_shopping_project_id": 3,

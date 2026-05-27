@@ -13,7 +13,7 @@ class Config:
     the environment so it can be kept out of the config file and source control.
     """
 
-    vosk_model: str
+    whisper_model: str
     vikunja_url: str
     vikunja_project_id: int
     vikunja_shopping_project_id: int
@@ -38,8 +38,8 @@ class Config:
 
     def validate(self) -> None:
         """Raise ValueError if any required path is missing or a field is invalid."""
-        if not Path(self.vosk_model).is_dir():
-            raise ValueError(f"vosk_model '{self.vosk_model}' is not a directory")
+        if not self.whisper_model:
+            raise ValueError("whisper_model must not be empty")
         if "/" in self.piper_bin and not Path(self.piper_bin).is_file():
             raise ValueError(f"piper_bin '{self.piper_bin}' not found")
         if not Path(self.piper_model).is_file():

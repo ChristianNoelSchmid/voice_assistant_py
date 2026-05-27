@@ -53,8 +53,8 @@ def main() -> None:
     ]
     dispatcher = Dispatcher(handlers)
 
-    print(f"Loading model from '{config.vosk_model}'...")
-    recognizer = SpeechRecognizer(config.vosk_model)
+    print(f"Loading Whisper model '{config.whisper_model}'...")
+    recognizer = SpeechRecognizer(config.whisper_model)
 
     audio_queue: queue.Queue[bytes] = queue.Queue(maxsize=AUDIO_QUEUE_MAX)
     wake_queue: queue.Queue[None] = queue.Queue()

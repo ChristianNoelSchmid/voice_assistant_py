@@ -1,4 +1,4 @@
-vosk
+faster-whisper
 sounddevice
 numpy
 openwakeword

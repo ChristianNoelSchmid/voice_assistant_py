@@ -5,11 +5,10 @@ import re
 import subprocess
 import sys
 
-
 _DUCK_CLASSES = {"Stream/Output/Audio", "Stream/Input/Audio"}
 
 
-class VolumeController:
+class VolumeDucker:
     """Ducks other applications' audio streams (input and output) via PipeWire.
 
     Uses pw-dump to enumerate Stream/Output/Audio and Stream/Input/Audio nodes
@@ -70,12 +69,16 @@ def _get_volume(node_id: str) -> str | None:
     try:
         out = subprocess.run(
             ["wpctl", "get-volume", node_id],
-            capture_output=True, text=True, timeout=2,
+            capture_output=True,
+            text=True,
+            timeout=2,
         ).stdout
         m = re.search(r"Volume:\s*([\d.]+)", out)
         return m.group(1) if m else None
     except Exception as exc:
-        print(f"[Volume] could not get volume for node {node_id}: {exc}", file=sys.stderr)
+        print(
+            f"[Volume] could not get volume for node {node_id}: {exc}", file=sys.stderr
+        )
         return None
 
 

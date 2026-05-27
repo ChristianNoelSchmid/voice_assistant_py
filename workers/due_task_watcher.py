@@ -54,6 +54,14 @@ class DueTaskWatcher(threading.Thread):
 
             time.sleep(max(0.0, sleep_for))
 
+            # Fire any reminders that became due during the sleep before refreshing,
+            # so a reminder due at exactly the poll boundary isn't dropped by _refresh().
+            now = datetime.now(timezone.utc)
+            while self._cache and self._cache[0].remind_at <= now:
+                reminder = self._cache.pop(0)
+                print(f"[Watcher] Due: {reminder.title!r}")
+                self._speaker.speak(f"Reminder: {reminder.title}")
+
             if time.monotonic() - last_poll >= _POLL_INTERVAL:
                 self._refresh()
                 last_poll = time.monotonic()

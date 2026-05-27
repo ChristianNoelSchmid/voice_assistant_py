@@ -11,8 +11,8 @@ from speaker import Speaker
 from tasks import TaskClient
 from tokens.duration_token import DurationToken
 from tokens.duration_token import parse as parse_duration
-from tokens.period import PeriodToken, Recurrence, Weekday
-from tokens.period import parse as parse_period
+from tokens.period_token import PeriodToken, Recurrence, Weekday
+from tokens.period_token import parse as parse_period
 from tokens.remind_token import parse as parse_remind
 from tokens.time_token import TimeToken
 from tokens.time_token import parse as parse_time

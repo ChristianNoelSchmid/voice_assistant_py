@@ -32,16 +32,16 @@ class Pipeline:
     def _start_wakeword(self) -> None:
         # Spawn the Python wake word detector as a child process. It writes "wake" to
         # stdout each time the wake word fires; we read that on a background thread.
-        self._wakeword_proc = subprocess.Popen(
-            [
-                sys.executable,
-                self._config.wakeword_script,
-                self._config.wakeword_model,
-                "--threshold",
-                str(self._config.wakeword_threshold),
-            ],
-            stdout=subprocess.PIPE,
-        )
+        cmd = [
+            sys.executable,
+            self._config.wakeword_script,
+            self._config.wakeword_model,
+            "--threshold",
+            str(self._config.wakeword_threshold),
+        ]
+        if self._config.mic_device is not None:
+            cmd += ["--device", str(self._config.mic_device)]
+        self._wakeword_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
 
         proc = self._wakeword_proc
 
@@ -58,7 +58,7 @@ class Pipeline:
     def run(self) -> None:
         self._start_wakeword()
 
-        with AudioInput() as audio:
+        with AudioInput(device=self._config.mic_device) as audio:
             while True:
                 # Non-blocking wake signal check before consuming the next audio chunk.
                 try:

@@ -11,7 +11,8 @@ _QUEUE_MAX = 64
 
 
 class AudioInput:
-    def __init__(self) -> None:
+    def __init__(self, device: int | str | None = None) -> None:
+        self._device = device
         self._queue: queue.Queue[bytes] = queue.Queue(maxsize=_QUEUE_MAX)
         self._stream: sd.InputStream | None = None
 
@@ -29,6 +30,7 @@ class AudioInput:
 
     def __enter__(self) -> AudioInput:
         self._stream = sd.InputStream(
+            device=self._device,
             samplerate=_SAMPLE_RATE,
             channels=1,
             dtype="int16",

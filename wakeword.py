@@ -50,6 +50,11 @@ def main():
         default=0.25,
         help="Detection score threshold (default: 0.5)",
     )
+    parser.add_argument(
+        "--device",
+        default=None,
+        help="Input device index or name substring (default: system default)",
+    )
     args = parser.parse_args()
 
     model_path = resolve_model(args.model)
@@ -71,7 +76,16 @@ def main():
             # Reset internal state to avoid repeated triggers from the same utterance
             model.reset()
 
+    # Convert numeric string to int so sounddevice can select by index
+    device = args.device
+    if device is not None:
+        try:
+            device = int(device)
+        except ValueError:
+            pass
+
     with sd.InputStream(
+        device=device,
         samplerate=SAMPLE_RATE,
         channels=1,
         dtype="float32",

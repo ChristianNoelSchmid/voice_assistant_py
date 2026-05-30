@@ -84,13 +84,34 @@ def main():
         except ValueError:
             pass
 
+    device_info = sd.query_devices(device, kind="input")
+    native_rate = int(device_info["default_samplerate"])
+    # Blocksize scaled to produce CHUNK_SIZE samples after resampling to SAMPLE_RATE
+    native_blocksize = int(round(CHUNK_SIZE * native_rate / SAMPLE_RATE))
+
+    def resampling_callback(indata, frames, time, status):
+        if status:
+            print(f"Audio status: {status}", file=sys.stderr, flush=True)
+        audio_channel = indata[:, 0]
+        if native_rate != SAMPLE_RATE:
+            audio_channel = np.interp(
+                np.linspace(0, len(audio_channel), CHUNK_SIZE, endpoint=False),
+                np.arange(len(audio_channel)),
+                audio_channel,
+            )
+        audio = (audio_channel * 32767).astype(np.int16)
+        scores = model.predict(audio)
+        if scores and max(scores.values()) >= args.threshold:
+            print("wake", flush=True)
+            model.reset()
+
     with sd.InputStream(
         device=device,
-        samplerate=SAMPLE_RATE,
+        samplerate=native_rate,
         channels=1,
         dtype="float32",
-        blocksize=CHUNK_SIZE,
-        callback=callback,
+        blocksize=native_blocksize,
+        callback=resampling_callback,
     ):
         sd.sleep(10_000_000)
 

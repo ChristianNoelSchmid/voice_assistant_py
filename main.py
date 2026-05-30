@@ -15,10 +15,11 @@ from config import Config
 from dispatcher import Dispatcher
 from pipeline import Pipeline
 from recognizer import SpeechRecognizer
-from speaker import PiperSpeaker
+from speaker import PiperSpeaker, QueuedSpeaker
 from tasks.vikunja import VikunjaClient
 from volume_ducker import VolumeDucker
 from workers.due_task_watcher import DueTaskWatcher
+from workers.timer_watcher import TimerWatcher
 
 
 def main() -> None:
@@ -31,16 +32,19 @@ def main() -> None:
         sys.exit("VIKUNJA_TOKEN is not set")
 
     vikunja = VikunjaClient(config.vikunja_url, vikunja_token)
-    speaker = PiperSpeaker(
-        config.piper_bin, config.piper_model, config.piper_sample_rate
+    speaker = QueuedSpeaker(
+        PiperSpeaker(config.piper_bin, config.piper_model, config.piper_sample_rate)
     )
     volume = VolumeDucker(config.volume_duck_level)
 
+    timer_watcher = TimerWatcher(speaker)
+    timer_watcher.start()
+
     handlers = [
+        TimerCommand(timer_watcher, speaker),
         RemindCommand(vikunja, speaker, config.vikunja_project_id),
         ShoppingCommand(vikunja, speaker, config.vikunja_shopping_project_id),
         ClockCommand(speaker),
-        TimerCommand(speaker),
         UnhandledCommand(speaker),
     ]
     dispatcher = Dispatcher(handlers)

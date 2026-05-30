@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import queue
 import subprocess
 import sys
+import threading
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -44,3 +46,26 @@ class PiperSpeaker(Speaker):
             return
         samples = np.frombuffer(proc.stdout, dtype=np.int16)
         sd.play(samples, samplerate=self._rate, blocking=True)
+
+
+class QueuedSpeaker(Speaker):
+    """Non-blocking speaker that serialises utterances on a dedicated thread.
+
+    Callers return immediately from speak(); the background thread processes
+    each item in order so playback never overlaps.
+    """
+
+    def __init__(self, backend: Speaker) -> None:
+        self._backend = backend
+        self._queue: queue.Queue[str] = queue.Queue()
+        thread = threading.Thread(target=self._worker, daemon=True, name="Speaker")
+        thread.start()
+
+    def speak(self, text: str) -> None:
+        self._queue.put(text)
+
+    def _worker(self) -> None:
+        while True:
+            text = self._queue.get()
+            self._backend.speak(text)
+            self._queue.task_done()

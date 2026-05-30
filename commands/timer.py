@@ -1,43 +1,42 @@
 from __future__ import annotations
 
-import threading
 from dataclasses import dataclass
 from typing import Optional
 
 from commands import CommandHandler
 from speaker import Speaker
-from tokens.timer_token import TimerToken
+from tokens.duration_token import DurationToken
+from tokens.duration_token import parse as parse_duration
 from tokens.timer_token import parse as parse_timer
+from workers.timer_watcher import TimerWatcher
 
 
 @dataclass
 class TimerMatch:
-    token: TimerToken
+    duration: DurationToken
 
 
 class TimerCommand(CommandHandler):
-    """Handles 'timer [for] N minutes/hours/seconds' → counts down and announces when done."""
+    """Handles utterances containing 'timer' and a duration, e.g. 'timer 5 minutes'."""
 
-    def __init__(self, speaker: Speaker) -> None:
+    def __init__(self, watcher: TimerWatcher, speaker: Speaker) -> None:
+        self._watcher = watcher
         self._speaker = speaker
 
     def parse(self, text: str) -> Optional[TimerMatch]:
-        result = parse_timer(text)
+        if parse_timer(text) is None:
+            return None
+        result = parse_duration(text)
         if result is None:
             return None
         token, _ = result
-        return TimerMatch(token=token)
+        return TimerMatch(duration=token)
 
     def handle(self, match: TimerMatch) -> None:
-        seconds = match.token.seconds
-        label = _format_duration(seconds)
+        label = _format_duration(match.duration.seconds)
         print(f"[Timer] Set for {label}")
         self._speaker.speak(f"Timer set for {label}.")
-        threading.Timer(seconds, self._announce, args=(label,)).start()
-
-    def _announce(self, label: str) -> None:
-        print(f"[Timer] Elapsed: {label}")
-        self._speaker.speak(f"Timer done. Your {label} timer has elapsed.")
+        self._watcher.add(match.duration.seconds, label)
 
 
 def _format_duration(seconds: int) -> str:

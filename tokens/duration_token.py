@@ -29,21 +29,21 @@ _WORD_NUMS: dict[str, int] = {
 _UNIT_SECONDS: dict[str, int] = {"second": 1, "minute": 60, "hour": 3600}
 
 _WORD_NUM_PAT = "|".join(re.escape(w) for w in _WORD_NUMS)
-_IN_DURATION = re.compile(
-    rf"(?i)\bin\s+(\d+|{_WORD_NUM_PAT})\s+(hours?|minutes?|seconds?)\b"
+_DURATION = re.compile(
+    rf"(?i)\b(\d+|{_WORD_NUM_PAT})\s+(hours?|minutes?|seconds?)\b"
 )
 
 
 @dataclass
 class DurationToken:
-    """A relative offset parsed from phrases like 'in 5 minutes' or 'in one hour'."""
+    """A duration parsed from phrases like '5 minutes' or 'one hour'."""
 
     seconds: int
 
 
 def parse(text: str) -> Optional[tuple[DurationToken, tuple[int, int]]]:
-    """Parse a relative duration from *text*, returning (token, (start, end)) or None."""
-    m = _IN_DURATION.search(text)
+    """Parse a duration from *text*, returning (token, (start, end)) or None."""
+    m = _DURATION.search(text)
     if not m:
         return None
     raw = m.group(1).lower()

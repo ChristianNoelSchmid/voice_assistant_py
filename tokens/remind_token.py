@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
-_REMIND = re.compile(r"")
+_REMIND = re.compile(r"remind")
 
 
 @dataclass
